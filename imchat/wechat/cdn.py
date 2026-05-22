@@ -1,8 +1,8 @@
 import os
 import hashlib
 import secrets
-from typing import Optional, Tuple
-import httpx
+from typing import Optional
+import aiohttp
 
 from .api import WeChatAPIClient
 from .crypto import encrypt_aes_ecb, aes_ecb_padded_size, decrypt_aes_ecb, parse_aes_key
@@ -15,7 +15,6 @@ UPLOAD_MAX_RETRIES = 3
 
 
 class WeChatCDNClient:
-    """微信 CDN 客户端"""
 
     def __init__(
         self,
@@ -24,7 +23,7 @@ class WeChatCDNClient:
     ):
         self.api = api_client
         self.cdn_base_url = cdn_base_url.rstrip("/")
-        self._http = httpx.AsyncClient()
+        self._http = aiohttp.ClientSession()
 
     def _build_download_url(self, encrypted_query_param: str) -> str:
         return f"{self.cdn_base_url}/download?encrypted_query_param={encrypted_query_param}"
@@ -41,10 +40,6 @@ class WeChatCDNClient:
         to_user_id: str,
         media_type: UploadMediaType = UploadMediaType.FILE,
     ) -> "UploadedFileInfo":
-        """
-        上传本地文件到微信 CDN
-        流程: 读取文件 → 计算 MD5 → 生成 AES key → 获取上传 URL → 加密上传
-        """
         with open(file_path, "rb") as f:
             plaintext = f.read()
 
@@ -75,7 +70,6 @@ class WeChatCDNClient:
 
         ciphertext = encrypt_aes_ecb(plaintext, aeskey)
 
-        # 确定 CDN 上传 URL
         if upload_full_url and upload_full_url.strip():
             cdn_url = upload_full_url.strip()
         elif upload_param:
@@ -96,7 +90,6 @@ class WeChatCDNClient:
     async def _upload_to_cdn(
         self, cdn_url: str, ciphertext: bytes, filekey: str
     ) -> str:
-        """上传加密后的数据到 CDN,带重试"""
         last_error = None
 
         for attempt in range(1, UPLOAD_MAX_RETRIES + 1):
@@ -104,15 +97,15 @@ class WeChatCDNClient:
                 resp = await self._http.post(
                     cdn_url,
                     headers={"Content-Type": "application/octet-stream"},
-                    content=ciphertext,
+                    data=ciphertext,
                 )
 
-                if 400 <= resp.status_code < 500:
-                    err_msg = resp.headers.get("x-error-message") or resp.text
-                    raise WeChatCDNError(f"CDN upload client error {resp.status_code}: {err_msg}")
+                if 400 <= resp.status < 500:
+                    err_msg = resp.headers.get("x-error-message") or (await resp.text())
+                    raise WeChatCDNError(f"CDN upload client error {resp.status}: {err_msg}")
 
-                if resp.status_code != 200:
-                    err_msg = resp.headers.get("x-error-message") or f"status {resp.status_code}"
+                if resp.status != 200:
+                    err_msg = resp.headers.get("x-error-message") or f"status {resp.status}"
                     raise WeChatCDNError(f"CDN upload server error: {err_msg}")
 
                 download_param = resp.headers.get("x-encrypted-param")
@@ -140,7 +133,6 @@ class WeChatCDNClient:
         aes_key_base64: str,
         full_url: Optional[str] = None,
     ) -> bytes:
-        """下载并解密 CDN 文件"""
         key = parse_aes_key(aes_key_base64)
 
         if full_url:
@@ -151,11 +143,11 @@ class WeChatCDNClient:
             raise WeChatCDNError("full_url is required (CDN URL fallback is disabled)")
 
         resp = await self._http.get(url)
-        if not resp.is_success:
-            body = resp.text or "(unreadable)"
-            raise WeChatCDNError(f"CDN download {resp.status_code} {resp.reason_phrase}: {body}")
+        if not resp.ok:
+            body = await resp.text() or "(unreadable)"
+            raise WeChatCDNError(f"CDN download {resp.status} {resp.reason}: {body}")
 
-        encrypted = resp.content
+        encrypted = await resp.read()
         return decrypt_aes_ecb(encrypted, key)
 
     async def download_plain(
@@ -163,7 +155,6 @@ class WeChatCDNClient:
         encrypted_query_param: str,
         full_url: Optional[str] = None,
     ) -> bytes:
-        """下载未加密的 CDN 文件"""
         if full_url:
             url = full_url
         elif ENABLE_CDN_URL_FALLBACK:
@@ -172,18 +163,17 @@ class WeChatCDNClient:
             raise WeChatCDNError("full_url is required (CDN URL fallback is disabled)")
 
         resp = await self._http.get(url)
-        if not resp.is_success:
-            body = resp.text or "(unreadable)"
-            raise WeChatCDNError(f"CDN download {resp.status_code} {resp.reason_phrase}: {body}")
+        if not resp.ok:
+            body = await resp.text() or "(unreadable)"
+            raise WeChatCDNError(f"CDN download {resp.status} {resp.reason}: {body}")
 
-        return resp.content
+        return await resp.read()
 
     async def close(self):
-        await self._http.aclose()
+        await self._http.close()
 
 
 class UploadedFileInfo:
-    """上传后的文件信息"""
 
     def __init__(
         self,

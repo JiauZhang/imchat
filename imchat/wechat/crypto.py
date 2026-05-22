@@ -4,7 +4,6 @@ import math
 
 
 def encrypt_aes_ecb(plaintext: bytes, key: bytes) -> bytes:
-    """使用 AES-128-ECB (PKCS7 padding) 加密"""
     cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
     encryptor = cipher.encryptor()
     padded = _pkcs7_pad(plaintext, 16)
@@ -12,7 +11,6 @@ def encrypt_aes_ecb(plaintext: bytes, key: bytes) -> bytes:
 
 
 def decrypt_aes_ecb(ciphertext: bytes, key: bytes) -> bytes:
-    """使用 AES-128-ECB (PKCS7 padding) 解密"""
     cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
     decryptor = cipher.decryptor()
     padded = decryptor.update(ciphertext) + decryptor.finalize()
@@ -20,7 +18,6 @@ def decrypt_aes_ecb(ciphertext: bytes, key: bytes) -> bytes:
 
 
 def aes_ecb_padded_size(plaintext_size: int) -> int:
-    """计算 AES-128-ECB 密文大小 (PKCS7 padding 到 16 字节边界)"""
     return math.ceil((plaintext_size + 1) / 16) * 16
 
 
@@ -39,16 +36,7 @@ def _pkcs7_unpad(data: bytes) -> bytes:
 
 
 def parse_aes_key(aes_key_base64: str) -> bytes:
-    """
-    解析 CDNMedia.aes_key 为原始 16 字节 AES key
-
-    两种编码方式:
-    - base64(raw 16 bytes)          → 图片 (aes_key 来自 media 字段)
-    - base64(hex string of 16 bytes) → 文件/语音/视频
-
-    第二种情况下, base64 解码后得到 32 个 ASCII hex 字符,
-    需要再按 hex 解析才能得到真正的 16 字节 key
-    """
+    """CDNMedia.aes_key: base64(raw 16 bytes) | base64(hex string of 16 bytes)"""
     import base64
     decoded = base64.b64decode(aes_key_base64)
     if len(decoded) == 16:

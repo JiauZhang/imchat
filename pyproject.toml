@@ -15,8 +15,8 @@ classifiers = []
 keywords = []
 requires-python = ">=3.10"
 dependencies = [
-    'conippets>=0.1.19',
-    'httpx',
+    'conippets>=0.1.16',
+    'aiohttp>=3.13',
 ]
 
 [project.urls]

@@ -3,6 +3,7 @@ import uuid
 from typing import Optional, List, Callable, AsyncIterator, Dict, Any
 from dataclasses import dataclass, field
 
+from .exceptions import WeChatError, WeChatSessionExpired
 from .api import WeChatAPIClient, DEFAULT_LONG_POLL_TIMEOUT_MS
 from .auth import WeChatAuth, LoginResult
 from .cdn import WeChatCDNClient, UploadedFileInfo
@@ -23,12 +24,11 @@ from .types import (
     TypingStatus,
     GetConfigResp,
 )
-from .exceptions import WeChatError, WeChatSessionExpired
+from ..keystore import load_keys, save_keys, delete_keys
 
 
 @dataclass
 class MessageContext:
-    """入站消息上下文"""
     body: str
     from_user_id: str
     to_user_id: str
@@ -40,19 +40,6 @@ class MessageContext:
 
 
 class WeChatClient:
-    """
-    微信聊天客户端
-
-    使用示例:
-        client = WeChatClient(base_url="https://ilinkai.weixin.qq.com", token="your_token")
-
-        # 发送文本消息
-        await client.send_text("user@im.wechat", "Hello!")
-
-        # 接收消息 (长轮询)
-        async for msg in client.poll_messages():
-            print(msg.body)
-    """
 
     def __init__(
         self,
@@ -80,8 +67,20 @@ class WeChatClient:
         self._running = False
 
     # ------------------------------------------------------------------
-    # 认证
+    # auth
     # ------------------------------------------------------------------
+
+    @classmethod
+    def from_saved_keys(cls) -> Optional["WeChatClient"]:
+        keys = load_keys("wechat")
+        token = keys.get("token")
+        if not token:
+            return None
+        return cls(
+            base_url=keys.get("base_url", "https://ilinkai.weixin.qq.com"),
+            token=token,
+            account_id=keys.get("account_id"),
+        )
 
     async def login_with_qr(
         self,
@@ -89,10 +88,6 @@ class WeChatClient:
         verbose: bool = False,
         on_status_change: Optional[Callable[[str], None]] = None,
     ) -> LoginResult:
-        """
-        扫码登录流程
-        返回包含 bot_token 和 account_id 的 LoginResult
-        """
         start = await self._auth.start_login(self.account_id)
         qrcode_url = start["qrcode_url"]
         session_key = start["session_key"]
@@ -117,15 +112,27 @@ class WeChatClient:
             if result.account_id:
                 self.account_id = result.account_id
 
+            save_keys("wechat", {
+                "token": result.bot_token,
+                "account_id": result.account_id,
+                "user_id": result.user_id,
+                "base_url": result.base_url or self.base_url,
+            })
+
         return result
 
     def set_token(self, token: str):
-        """设置已获取的 token"""
         self.token = token
         self._api.token = token
 
+    def logout(self):
+        delete_keys("wechat")
+        self.token = None
+        self._api.token = None
+        self.account_id = str(uuid.uuid4())
+
     # ------------------------------------------------------------------
-    # 消息发送
+    # send
     # ------------------------------------------------------------------
 
     def _generate_client_id(self) -> str:
@@ -138,7 +145,6 @@ class WeChatClient:
         self._context_tokens[user_id] = token
 
     async def send_text(self, to: str, text: str, context_token: Optional[str] = None) -> str:
-        """发送文本消息"""
         client_id = self._generate_client_id()
         ctx_token = context_token or self._get_context_token(to)
 
@@ -167,7 +173,6 @@ class WeChatClient:
         text: Optional[str] = None,
         context_token: Optional[str] = None,
     ) -> str:
-        """发送图片消息"""
         uploaded = await self._cdn.upload_file(
             file_path, to, media_type=UploadMediaType.IMAGE
         )
@@ -182,7 +187,6 @@ class WeChatClient:
         text: Optional[str] = None,
         context_token: Optional[str] = None,
     ) -> str:
-        """发送视频消息"""
         uploaded = await self._cdn.upload_file(
             file_path, to, media_type=UploadMediaType.VIDEO
         )
@@ -197,7 +201,6 @@ class WeChatClient:
         text: Optional[str] = None,
         context_token: Optional[str] = None,
     ) -> str:
-        """发送文件消息"""
         import os
         uploaded = await self._cdn.upload_file(
             file_path, to, media_type=UploadMediaType.FILE
@@ -214,7 +217,6 @@ class WeChatClient:
         media_type: MessageItemType,
         context_token: Optional[str] = None,
     ) -> str:
-        """发送媒体消息的内部方法"""
         ctx_token = context_token or self._get_context_token(to)
         client_id = self._generate_client_id()
 
@@ -256,7 +258,6 @@ class WeChatClient:
                 )
             )
 
-        # 分别发送每条消息
         last_client_id = ""
         for item in items:
             last_client_id = self._generate_client_id()
@@ -275,7 +276,6 @@ class WeChatClient:
         return last_client_id
 
     async def send_typing(self, to: str, typing_ticket: str, status: TypingStatus = TypingStatus.TYPING):
-        """发送 typing 指示器"""
         req = SendTypingReq(
             ilink_user_id=to,
             typing_ticket=typing_ticket,
@@ -284,11 +284,10 @@ class WeChatClient:
         await self._api.send_typing(req)
 
     # ------------------------------------------------------------------
-    # 消息接收
+    # receive
     # ------------------------------------------------------------------
 
     async def get_updates(self, get_updates_buf: Optional[str] = None) -> List[WeixinMessage]:
-        """获取一次消息更新"""
         buf = get_updates_buf if get_updates_buf is not None else self._get_updates_buf
         resp = await self._api.get_updates(buf)
 
@@ -307,15 +306,6 @@ class WeChatClient:
         on_message: Optional[Callable[[MessageContext], None]] = None,
         auto_ack: bool = True,
     ) -> AsyncIterator[MessageContext]:
-        """
-        长轮询消息循环
-        这是一个异步生成器,持续 yield 收到的消息
-
-        使用示例:
-            async for ctx in client.poll_messages():
-                print(f"收到消息: {ctx.body}")
-                await client.send_text(ctx.from_user_id, "收到!")
-        """
         self._running = True
 
         while self._running:
@@ -324,7 +314,6 @@ class WeChatClient:
                 for msg in msgs:
                     ctx = self._message_to_context(msg)
 
-                    # 缓存 context_token
                     if msg.context_token and msg.from_user_id:
                         self._set_context_token(msg.from_user_id, msg.context_token)
 
@@ -334,14 +323,11 @@ class WeChatClient:
                     yield ctx
 
             except WeChatSessionExpired:
-                # 会话过期,暂停一段时间
-                await asyncio.sleep(60 * 60)  # 暂停 1 小时
+                await asyncio.sleep(60 * 60)
             except Exception:
-                # 其他错误,短暂等待后重试
                 await asyncio.sleep(2)
 
     def _message_to_context(self, msg: WeixinMessage) -> MessageContext:
-        """将 WeixinMessage 转换为 MessageContext"""
         body = self._extract_body(msg.item_list)
 
         ctx = MessageContext(
@@ -355,7 +341,6 @@ class WeChatClient:
         return ctx
 
     def _extract_body(self, item_list: Optional[List[MessageItem]]) -> str:
-        """从 item_list 提取文本内容"""
         if not item_list:
             return ""
 
@@ -392,7 +377,7 @@ class WeChatClient:
         )
 
     # ------------------------------------------------------------------
-    # 媒体下载
+    # media download
     # ------------------------------------------------------------------
 
     async def download_media(
@@ -401,7 +386,6 @@ class WeChatClient:
         aes_key_base64: str,
         full_url: Optional[str] = None,
     ) -> bytes:
-        """下载并解密媒体文件"""
         return await self._cdn.download_and_decrypt(
             encrypted_query_param, aes_key_base64, full_url
         )
@@ -411,29 +395,25 @@ class WeChatClient:
         encrypted_query_param: str,
         full_url: Optional[str] = None,
     ) -> bytes:
-        """下载未加密的媒体文件"""
         return await self._cdn.download_plain(encrypted_query_param, full_url)
 
     # ------------------------------------------------------------------
-    # 配置
+    # config
     # ------------------------------------------------------------------
 
     async def get_config(
         self, user_id: str, context_token: Optional[str] = None
     ) -> GetConfigResp:
-        """获取用户配置 (包含 typing_ticket)"""
         return await self._api.get_config(user_id, context_token)
 
     # ------------------------------------------------------------------
-    # 生命周期
+    # lifecycle
     # ------------------------------------------------------------------
 
     def stop(self):
-        """停止消息轮询"""
         self._running = False
 
     async def close(self):
-        """关闭客户端,释放资源"""
         self.stop()
         await self._api.close()
         await self._cdn.close()

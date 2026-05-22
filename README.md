@@ -7,7 +7,7 @@ Currently supports WeChat, with more platforms (QQ, Telegram, etc.) coming.
 ## Features
 
 - **Unified abstraction** — consistent send/receive interfaces across different IM platforms
-- **Async-native** — built on `asyncio` and `httpx` for high-concurrency scenarios
+- **Async-native** — built on `asyncio` and `aiohttp` for high-concurrency scenarios
 - **Rich message types** — text, image, video, file, voice and more
 - **Long-polling** — built-in message polling loop, easy to integrate into any async application
 - **Pluggable architecture** — add a new platform by implementing its adapter

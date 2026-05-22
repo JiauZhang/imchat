@@ -22,7 +22,7 @@ class QRCodeResponse:
 
 @dataclass
 class QRStatusResponse:
-    status: str  # "wait" | "scaned" | "confirmed" | "expired" | "scaned_but_redirect"
+    status: str
     bot_token: Optional[str] = None
     ilink_bot_id: Optional[str] = None
     baseurl: Optional[str] = None
@@ -41,20 +41,14 @@ class LoginResult:
 
 
 class WeChatAuth:
-    """微信扫码认证管理器"""
 
     def __init__(self, bot_type: str = DEFAULT_ILINK_BOT_TYPE):
         self.bot_type = bot_type
         self._active_logins: Dict[str, Dict[str, Any]] = {}
 
     async def start_login(self, account_id: Optional[str] = None) -> Dict[str, str]:
-        """
-        开始微信扫码登录
-        返回: {"qrcode_url": "...", "session_key": "...", "message": "..."}
-        """
         session_key = account_id or str(uuid.uuid4())
 
-        # 清理过期登录
         now = asyncio.get_event_loop().time() * 1000
         expired = [
             k for k, v in self._active_logins.items()
@@ -63,7 +57,6 @@ class WeChatAuth:
         for k in expired:
             del self._active_logins[k]
 
-        # 检查是否有活跃的登录
         existing = self._active_logins.get(session_key)
         if existing and (now - existing["started_at"] < ACTIVE_LOGIN_TTL_MS):
             return {
@@ -106,10 +99,6 @@ class WeChatAuth:
         verbose: bool = False,
         on_status_change: Optional[Callable[[str], None]] = None,
     ) -> LoginResult:
-        """
-        等待扫码登录完成
-        轮询 QR 码状态直到确认或超时
-        """
         active_login = self._active_logins.get(session_key)
         if not active_login:
             return LoginResult(
@@ -141,7 +130,6 @@ class WeChatAuth:
                     active_login["qrcode"], timeout_ms=QR_LONG_POLL_TIMEOUT_MS
                 )
             except Exception as e:
-                # 网络错误视为等待状态继续轮询
                 if verbose:
                     print(f".", end="", flush=True)
                 await asyncio.sleep(1)
@@ -200,8 +188,6 @@ class WeChatAuth:
                 redirect_host = status_resp.get("redirect_host")
                 if redirect_host:
                     active_login["current_api_base_url"] = f"https://{redirect_host}"
-                else:
-                    pass  # 继续用当前 host
 
             elif status == "confirmed":
                 bot_token = status_resp.get("bot_token")
