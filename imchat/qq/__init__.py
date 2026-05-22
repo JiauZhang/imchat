@@ -16,7 +16,6 @@ from .types import (
 )
 from .exceptions import QQError, AuthError, APIError, GatewayError
 
-__version__ = "0.1.0"
 __all__ = [
     "QQClient",
     "QQConfig",
