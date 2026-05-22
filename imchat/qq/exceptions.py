@@ -28,3 +28,8 @@ class GatewayError(QQError):
 
 class TokenExpiredError(AuthError):
     pass
+
+
+QQAuthError = AuthError
+QQAPIError = APIError
+QQGatewayError = GatewayError

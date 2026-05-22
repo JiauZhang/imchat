@@ -14,6 +14,7 @@ from .types import (
     GuildMessage,
     Interaction,
     MessageHandler,
+    StreamMessageRequest,
 )
 from ..keystore import load_keys, save_keys, delete_keys
 
@@ -22,8 +23,25 @@ logger = logging.getLogger("imchat.qq.client")
 
 class QQClient:
 
-    def __init__(self, config: QQConfig | None = None) -> None:
-        self.config = config or QQConfig.from_env()
+    def __init__(
+        self,
+        config: QQConfig | None = None,
+        app_id: str | None = None,
+        client_secret: str | None = None,
+        markdown_support: bool = True,
+    ) -> None:
+        if config:
+            self.config = config
+        else:
+            self.config = QQConfig(
+                app_id=app_id or "",
+                client_secret=client_secret or "",
+                markdown_support=markdown_support,
+            )
+            if not self.config.app_id:
+                self.config.app_id = QQConfig.from_env().app_id
+            if not self.config.resolve_client_secret():
+                self.config.client_secret = QQConfig.from_env().resolve_client_secret()
         self.auth = AuthManager()
         self.api = QQBotAPI(
             auth=self.auth,
@@ -136,6 +154,106 @@ class QQClient:
 
     async def send_group_image(self, group_openid: str, image_url: str | None = None, image_data: bytes | None = None, **kwargs: Any) -> Any:
         return await self.api.send_group_image(group_openid, image_url=image_url, image_data=image_data, **kwargs)
+
+    async def get_gateway_url(self) -> str:
+        return await self.api.get_gateway_url()
+
+    async def send_proactive_c2c_message(self, openid: str, content: str) -> Any:
+        return await self.api.send_proactive_c2c_message(openid, content)
+
+    async def send_proactive_group_message(self, group_openid: str, content: str) -> dict[str, Any]:
+        return await self.api.send_proactive_group_message(group_openid, content)
+
+    async def send_c2c_input_notify(
+        self,
+        openid: str,
+        msg_id: str | None = None,
+        input_second: int = 60,
+    ) -> dict[str, Any]:
+        return await self.api.send_c2c_input_notify(openid, msg_id=msg_id, input_second=input_second)
+
+    async def upload_c2c_media(
+        self,
+        openid: str,
+        file_type: Any,
+        url: str | None = None,
+        file_data: bytes | None = None,
+        srv_send_msg: bool = False,
+        file_name: str | None = None,
+    ) -> dict[str, Any]:
+        return await self.api.upload_c2c_media(openid, file_type, url=url, file_data=file_data, srv_send_msg=srv_send_msg, file_name=file_name)
+
+    async def upload_group_media(
+        self,
+        group_openid: str,
+        file_type: Any,
+        url: str | None = None,
+        file_data: bytes | None = None,
+        srv_send_msg: bool = False,
+        file_name: str | None = None,
+    ) -> dict[str, Any]:
+        return await self.api.upload_group_media(group_openid, file_type, url=url, file_data=file_data, srv_send_msg=srv_send_msg, file_name=file_name)
+
+    async def send_c2c_voice(
+        self,
+        openid: str,
+        voice_data: bytes | None = None,
+        voice_url: str | None = None,
+        msg_id: str | None = None,
+    ) -> Any:
+        return await self.api.send_c2c_voice(openid, voice_data=voice_data, voice_url=voice_url, msg_id=msg_id)
+
+    async def send_group_voice(
+        self,
+        group_openid: str,
+        voice_data: bytes | None = None,
+        voice_url: str | None = None,
+        msg_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self.api.send_group_voice(group_openid, voice_data=voice_data, voice_url=voice_url, msg_id=msg_id)
+
+    async def send_c2c_file(
+        self,
+        openid: str,
+        file_data: bytes | None = None,
+        file_url: str | None = None,
+        msg_id: str | None = None,
+        file_name: str | None = None,
+    ) -> Any:
+        return await self.api.send_c2c_file(openid, file_data=file_data, file_url=file_url, msg_id=msg_id, file_name=file_name)
+
+    async def send_group_file(
+        self,
+        group_openid: str,
+        file_data: bytes | None = None,
+        file_url: str | None = None,
+        msg_id: str | None = None,
+        file_name: str | None = None,
+    ) -> dict[str, Any]:
+        return await self.api.send_group_file(group_openid, file_data=file_data, file_url=file_url, msg_id=msg_id, file_name=file_name)
+
+    async def send_c2c_video(
+        self,
+        openid: str,
+        video_data: bytes | None = None,
+        video_url: str | None = None,
+        msg_id: str | None = None,
+        content: str = "",
+    ) -> Any:
+        return await self.api.send_c2c_video(openid, video_data=video_data, video_url=video_url, msg_id=msg_id, content=content)
+
+    async def send_group_video(
+        self,
+        group_openid: str,
+        video_data: bytes | None = None,
+        video_url: str | None = None,
+        msg_id: str | None = None,
+        content: str = "",
+    ) -> dict[str, Any]:
+        return await self.api.send_group_video(group_openid, video_data=video_data, video_url=video_url, msg_id=msg_id, content=content)
+
+    async def send_c2c_stream_message(self, openid: str, req: StreamMessageRequest) -> Any:
+        return await self.api.send_c2c_stream_message(openid, req)
 
     @staticmethod
     async def _route_message(msg: Any, handler: MessageHandler) -> None:

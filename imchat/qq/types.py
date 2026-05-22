@@ -296,3 +296,24 @@ class InlineKeyboard:
                 ]
             }
         }
+
+
+QQMediaFileType = MediaFileType
+QQMessageAttachment = MessageAttachment
+QQMessageResponse = MessageResponse
+QQC2CMessage = C2CMessage
+QQGroupMessage = GroupMessage
+QQGuildMessage = GuildMessage
+QQDirectMessage = DirectMessage
+QQInteraction = Interaction
+QQInlineKeyboard = InlineKeyboard
+QQKeyboardRow = KeyboardRow
+QQKeyboardButton = KeyboardButton
+QQMessageHandler = MessageHandler
+QQC2CMessageHandler = C2CMessageHandler
+QQGroupMessageHandler = GroupMessageHandler
+QQGuildMessageHandler = GuildMessageHandler
+QQDirectMessageHandler = DirectMessageHandler
+QQInteractionHandler = InteractionHandler
+QQReadyHandler = ReadyHandler
+QQErrorHandler = ErrorHandler

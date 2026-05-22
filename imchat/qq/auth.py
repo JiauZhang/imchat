@@ -161,3 +161,6 @@ class AuthManager:
         py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
         os_name = platform.system().lower()
         return f"QQBotSDK/0.1.0 (Python/{py_version}; {os_name})"
+
+
+QQAuth = AuthManager

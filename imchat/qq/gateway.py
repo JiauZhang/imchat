@@ -436,3 +436,6 @@ class GatewayClient:
             if ref.get("msg_idx") and not result["ref_msg_idx"]:
                 result["ref_msg_idx"] = ref["msg_idx"]
         return result
+
+
+QQGateway = GatewayClient

@@ -532,3 +532,26 @@ class GetConfigResp:
             errmsg=d.get("errmsg"),
             typing_ticket=d.get("typing_ticket"),
         )
+
+
+WeChatMessage = WeixinMessage
+WeChatMessageItem = MessageItem
+WeChatTextItem = TextItem
+WeChatImageItem = ImageItem
+WeChatVoiceItem = VoiceItem
+WeChatFileItem = FileItem
+WeChatVideoItem = VideoItem
+WeChatCDNMedia = CDNMedia
+WeChatSendMessageReq = SendMessageReq
+WeChatSendTypingReq = SendTypingReq
+WeChatGetUpdatesReq = GetUpdatesReq
+WeChatGetUpdatesResp = GetUpdatesResp
+WeChatGetUploadUrlReq = GetUploadUrlReq
+WeChatGetUploadUrlResp = GetUploadUrlResp
+WeChatGetConfigResp = GetConfigResp
+WeChatBaseInfo = BaseInfo
+WeChatUploadMediaType = UploadMediaType
+WeChatMessageType = MessageType
+WeChatMessageItemType = MessageItemType
+WeChatMessageState = MessageState
+WeChatTypingStatus = TypingStatus

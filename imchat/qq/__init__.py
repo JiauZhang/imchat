@@ -1,38 +1,42 @@
 from .client import QQClient
 from .config import QQConfig
-from .auth import AuthManager
+from .auth import QQAuth, AuthManager
 from .api import QQBotAPI
-from .gateway import GatewayClient
+from .gateway import QQGateway, GatewayClient
 from .types import (
-    C2CMessage,
-    GroupMessage,
-    GuildMessage,
-    DirectMessage,
-    Interaction,
-    MessageAttachment,
-    MediaFileType,
-    InlineKeyboard,
-    MessageResponse,
+    QQC2CMessage,
+    QQGroupMessage,
+    QQGuildMessage,
+    QQDirectMessage,
+    QQInteraction,
+    QQMessageAttachment,
+    QQMediaFileType,
+    QQInlineKeyboard,
+    QQKeyboardRow,
+    QQKeyboardButton,
+    QQMessageResponse,
 )
-from .exceptions import QQError, AuthError, APIError, GatewayError
+from .exceptions import QQError, QQAuthError, QQAPIError, QQGatewayError
 
 __all__ = [
     "QQClient",
     "QQConfig",
-    "AuthManager",
+    "QQAuth",
     "QQBotAPI",
-    "GatewayClient",
-    "C2CMessage",
-    "GroupMessage",
-    "GuildMessage",
-    "DirectMessage",
-    "Interaction",
-    "MessageAttachment",
-    "MediaFileType",
-    "InlineKeyboard",
-    "MessageResponse",
+    "QQGateway",
+    "QQC2CMessage",
+    "QQGroupMessage",
+    "QQGuildMessage",
+    "QQDirectMessage",
+    "QQInteraction",
+    "QQMessageAttachment",
+    "QQMediaFileType",
+    "QQInlineKeyboard",
+    "QQKeyboardRow",
+    "QQKeyboardButton",
+    "QQMessageResponse",
     "QQError",
-    "AuthError",
-    "APIError",
-    "GatewayError",
+    "QQAuthError",
+    "QQAPIError",
+    "QQGatewayError",
 ]
