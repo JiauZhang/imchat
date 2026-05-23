@@ -15,7 +15,9 @@ from .types import (
     KeyboardRow as QQKeyboardRow,
     KeyboardButton as QQKeyboardButton,
     MessageResponse as QQMessageResponse,
+    StreamMessageRequest as QQStreamMessageRequest,
 )
+from .types import ErrorHandler as QQErrorHandler
 from .exceptions import QQError, AuthError as QQAuthError, APIError as QQAPIError, GatewayError as QQGatewayError
 
 __all__ = [
@@ -35,6 +37,8 @@ __all__ = [
     "QQKeyboardRow",
     "QQKeyboardButton",
     "QQMessageResponse",
+    "QQStreamMessageRequest",
+    "QQErrorHandler",
     "QQError",
     "QQAuthError",
     "QQAPIError",

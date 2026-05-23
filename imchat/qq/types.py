@@ -298,4 +298,3 @@ class InlineKeyboard:
         }
 
 
-QQErrorHandler = ErrorHandler

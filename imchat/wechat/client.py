@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from typing import Optional, List, Callable, AsyncIterator, Dict, Any
 from dataclasses import dataclass, field
@@ -201,7 +202,6 @@ class WeChatClient:
         text: Optional[str] = None,
         context_token: Optional[str] = None,
     ) -> str:
-        import os
         uploaded = await self._cdn.upload_file(
             file_path, to, media_type=UploadMediaType.FILE
         )
@@ -245,7 +245,6 @@ class WeChatClient:
                 )
             )
         elif media_type == MessageItemType.FILE:
-            import os
             file_name = os.path.basename(uploaded.filekey)
             items.append(
                 MessageItem(

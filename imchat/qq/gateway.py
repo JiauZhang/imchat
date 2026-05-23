@@ -273,7 +273,7 @@ class GatewayClient:
             except Exception:
                 pass
 
-    def _parse_c2c_message(self, d: Any) -> C2CMessage:
+    def _build_message(self, msg_cls: type, d: Any, **extra: Any) -> Any:
         author = d.get("author", {})
         scene = d.get("message_scene")
         refs = self._parse_ref_indices(
@@ -281,51 +281,41 @@ class GatewayClient:
             d.get("message_type"),
             d.get("msg_elements"),
         )
-        msg = C2CMessage(
+        msg = msg_cls(
             id=d.get("id", ""),
             content=d.get("content", ""),
             timestamp=d.get("timestamp", ""),
-            author_id=author.get("user_openid", ""),
             author_bot=author.get("bot", False),
-            user_openid=author.get("user_openid", ""),
             attachments=[self._parse_attachment(a) for a in d.get("attachments", [])],
             message_scene=MessageScene(source=scene["source"], ext=scene.get("ext", [])) if scene else None,
             message_type=d.get("message_type", 0),
             msg_elements=[self._parse_msg_element(e) for e in d.get("msg_elements", [])],
             msg_idx=refs.get("msg_idx"),
             ref_msg_idx=refs.get("ref_msg_idx"),
+            **extra,
         )
         msg._api = self.api
         return msg
 
+    def _parse_c2c_message(self, d: Any) -> C2CMessage:
+        author = d.get("author", {})
+        return self._build_message(
+            C2CMessage, d,
+            author_id=author.get("user_openid", ""),
+            user_openid=author.get("user_openid", ""),
+        )
+
     def _parse_group_message(self, d: Any) -> GroupMessage:
         author = d.get("author", {})
-        scene = d.get("message_scene")
-        refs = self._parse_ref_indices(
-            scene.get("ext") if scene else None,
-            d.get("message_type"),
-            d.get("msg_elements"),
-        )
-        msg = GroupMessage(
-            id=d.get("id", ""),
-            content=d.get("content", ""),
-            timestamp=d.get("timestamp", ""),
+        return self._build_message(
+            GroupMessage, d,
             author_id=author.get("member_openid", ""),
             author_name=author.get("username"),
-            author_bot=author.get("bot", False),
             group_openid=d.get("group_openid", ""),
             group_id=d.get("group_id", ""),
             member_openid=author.get("member_openid", ""),
             mentions=[self._parse_mention(m) for m in d.get("mentions", [])],
-            attachments=[self._parse_attachment(a) for a in d.get("attachments", [])],
-            message_scene=MessageScene(source=scene["source"], ext=scene.get("ext", [])) if scene else None,
-            message_type=d.get("message_type", 0),
-            msg_elements=[self._parse_msg_element(e) for e in d.get("msg_elements", [])],
-            msg_idx=refs.get("msg_idx"),
-            ref_msg_idx=refs.get("ref_msg_idx"),
         )
-        msg._api = self.api
-        return msg
 
     def _parse_guild_message(self, d: Any) -> GuildMessage:
         author = d.get("author", {})

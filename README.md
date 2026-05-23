@@ -2,7 +2,7 @@
 
 A Python async IM middleware — one unified API to connect multiple instant messaging platforms.
 
-Currently supports WeChat, with more platforms (QQ, Telegram, etc.) coming.
+Currently supports WeChat and QQ, with more platforms (Telegram, etc.) coming.
 
 ## Features
 
