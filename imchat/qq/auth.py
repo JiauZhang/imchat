@@ -33,7 +33,6 @@ class AuthManager:
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession(
                 timeout=aiohttp.ClientTimeout(total=30),
-                headers={"User-Agent": self._user_agent()},
             )
         return self._session
 
@@ -72,7 +71,7 @@ class AuthManager:
                 if not data.get("access_token"):
                     raise AuthError(f"Failed to get access_token: {data}")
 
-                expires_in = data.get("expires_in", 7200)
+                expires_in = int(data.get("expires_in", 7200))
                 expires_at = time.time() + expires_in
                 token = data["access_token"]
 
@@ -152,15 +151,3 @@ class AuthManager:
                 break
             except Exception:
                 await asyncio.sleep(retry_delay)
-
-    @staticmethod
-    def _user_agent() -> str:
-        import platform
-        import sys
-
-        py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-        os_name = platform.system().lower()
-        return f"QQBotSDK/0.1.0 (Python/{py_version}; {os_name})"
-
-
-QQAuth = AuthManager

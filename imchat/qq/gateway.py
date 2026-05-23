@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from typing import Any, Callable, Coroutine
 
 import aiohttp
@@ -40,9 +39,6 @@ FULL_INTENTS = (
 
 RECONNECT_DELAYS = [1, 2, 5, 10, 30, 60]
 MAX_RECONNECT_ATTEMPTS = 100
-RATE_LIMIT_DELAY = 60
-MAX_QUICK_DISCONNECT = 3
-QUICK_DISCONNECT_THRESHOLD = 5000
 
 
 class GatewayClient:
@@ -56,8 +52,6 @@ class GatewayClient:
         self._session_id: str | None = None
         self._last_seq: int | None = None
         self._reconnect_attempts = 0
-        self._last_connect_time = 0.0
-        self._quick_disconnect_count = 0
 
         self._c2c_handlers: list[Callable[[C2CMessage], Coroutine[Any, Any, None]]] = []
         self._group_handlers: list[Callable[[GroupMessage], Coroutine[Any, Any, None]]] = []
@@ -129,7 +123,6 @@ class GatewayClient:
             headers={"User-Agent": self.api._user_agent()},
         )
         self._ws = await self._session.ws_connect(gateway_url)
-        self._last_connect_time = time.time() * 1000
         self._reconnect_attempts = 0
 
         try:
@@ -217,6 +210,8 @@ class GatewayClient:
 
         elif t == "C2C_MESSAGE_CREATE":
             msg = self._parse_c2c_message(d)
+            if msg.author_bot:
+                return
             for handler in self._c2c_handlers:
                 asyncio.create_task(handler(msg))
 
@@ -291,6 +286,7 @@ class GatewayClient:
             content=d.get("content", ""),
             timestamp=d.get("timestamp", ""),
             author_id=author.get("user_openid", ""),
+            author_bot=author.get("bot", False),
             user_openid=author.get("user_openid", ""),
             attachments=[self._parse_attachment(a) for a in d.get("attachments", [])],
             message_scene=MessageScene(source=scene["source"], ext=scene.get("ext", [])) if scene else None,
@@ -436,6 +432,3 @@ class GatewayClient:
             if ref.get("msg_idx") and not result["ref_msg_idx"]:
                 result["ref_msg_idx"] = ref["msg_idx"]
         return result
-
-
-QQGateway = GatewayClient

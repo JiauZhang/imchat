@@ -10,7 +10,12 @@ logging.basicConfig(
 
 
 async def main():
-    client = QQClient()
+    client = QQClient.from_saved_keys()
+    if client is None:
+        print("QQ credentials not configured.")
+        print("Run qq_api_only.py first to configure credentials:")
+        print("  python examples/qq_api_only.py --app-id <app_id> --client-secret <client_secret>")
+        return
 
     @client.on_c2c_message
     async def handle_c2c(msg):

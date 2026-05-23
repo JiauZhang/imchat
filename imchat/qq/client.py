@@ -13,7 +13,6 @@ from .types import (
     GroupMessage,
     GuildMessage,
     Interaction,
-    MessageHandler,
     StreamMessageRequest,
 )
 from ..keystore import load_keys, save_keys, delete_keys
@@ -42,6 +41,10 @@ class QQClient:
                 self.config.app_id = QQConfig.from_env().app_id
             if not self.config.resolve_client_secret():
                 self.config.client_secret = QQConfig.from_env().resolve_client_secret()
+            if not self.config.app_id or not self.config.resolve_client_secret():
+                saved = self.from_saved_keys()
+                if saved:
+                    self.config = saved.config
         self.auth = AuthManager()
         self.api = QQBotAPI(
             auth=self.auth,
@@ -50,12 +53,11 @@ class QQClient:
             markdown_support=self.config.markdown_support,
         )
         self.gateway = GatewayClient(self.api)
-        self._message_handlers: list[MessageHandler] = []
 
     @classmethod
-    def from_saved_keys(cls, app_id: str | None = None) -> QQClient | None:
+    def from_saved_keys(cls) -> QQClient | None:
         keys = load_keys("qq")
-        saved_app_id = app_id or keys.get("app_id")
+        saved_app_id = keys.get("app_id")
         client_secret = keys.get("client_secret")
         if not saved_app_id or not client_secret:
             return None
@@ -75,19 +77,6 @@ class QQClient:
 
     def logout(self) -> None:
         delete_keys("qq")
-
-    def on_message(self, handler: MessageHandler | None = None) -> Callable[[MessageHandler], MessageHandler] | MessageHandler:
-        def decorator(h: MessageHandler) -> MessageHandler:
-            self._message_handlers.append(h)
-            self.gateway.on_c2c_message(lambda msg: self._route_message(msg, h))
-            self.gateway.on_group_message(lambda msg: self._route_message(msg, h))
-            self.gateway.on_guild_message(lambda msg: self._route_message(msg, h))
-            self.gateway.on_direct_message(lambda msg: self._route_message(msg, h))
-            return h
-
-        if handler is not None:
-            return decorator(handler)
-        return decorator
 
     def on_c2c_message(self, handler: Callable[[C2CMessage], Coroutine[Any, Any, None]]) -> Callable[[C2CMessage], Coroutine[Any, Any, None]]:
         self.gateway.on_c2c_message(handler)
@@ -119,7 +108,15 @@ class QQClient:
 
     async def start(self) -> None:
         if not self.config.app_id or not self.config.resolve_client_secret():
-            raise ValueError("QQClient not configured (missing app_id or client_secret)")
+            raise ValueError(
+                "QQClient not configured. Get app_id and client_secret from:\n"
+                "  https://bot.q.qq.com/\n\n"
+                "Then set credentials via:\n"
+                "  1. Environment: export QQBOT_APP_ID=<app_id> QQBOT_CLIENT_SECRET=<client_secret>\n"
+                "  2. Direct: client = QQClient(app_id='...', client_secret='...')\n"
+                "  3. Save: client.save_credentials()\n"
+                "  4. CLI: examples/qq_api_only.py --app-id <app_id> --client-secret <client_secret>"
+            )
 
         self.auth.start_background_refresh(
             self.config.app_id,
@@ -130,11 +127,13 @@ class QQClient:
             await self.gateway.start()
         finally:
             self.auth.stop_background_refresh(self.config.app_id)
+            await self.auth.close()
             await self.api.close()
 
     async def stop(self) -> None:
         await self.gateway.stop()
         self.auth.stop_background_refresh(self.config.app_id)
+        await self.auth.close()
         await self.api.close()
 
     async def send_c2c_message(self, openid: str, content: str, **kwargs: Any) -> Any:
@@ -157,12 +156,6 @@ class QQClient:
 
     async def get_gateway_url(self) -> str:
         return await self.api.get_gateway_url()
-
-    async def send_proactive_c2c_message(self, openid: str, content: str) -> Any:
-        return await self.api.send_proactive_c2c_message(openid, content)
-
-    async def send_proactive_group_message(self, group_openid: str, content: str) -> dict[str, Any]:
-        return await self.api.send_proactive_group_message(group_openid, content)
 
     async def send_c2c_input_notify(
         self,
@@ -254,10 +247,3 @@ class QQClient:
 
     async def send_c2c_stream_message(self, openid: str, req: StreamMessageRequest) -> Any:
         return await self.api.send_c2c_stream_message(openid, req)
-
-    @staticmethod
-    async def _route_message(msg: Any, handler: MessageHandler) -> None:
-        try:
-            await handler(msg)
-        except Exception as e:
-            logger.error(f"[qq-client] Message handler error: {e}")

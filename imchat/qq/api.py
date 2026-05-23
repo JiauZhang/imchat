@@ -172,15 +172,6 @@ class QQBotAPI:
             body["msg_id"] = msg_id
         return await self._request("POST", f"/dms/{guild_id}/messages", json=body)
 
-    async def send_proactive_c2c_message(self, openid: str, content: str) -> MessageResponse:
-        body = self._build_proactive_body(content)
-        data = await self._request("POST", f"/v2/users/{openid}/messages", json=body)
-        return self._to_message_response(data)
-
-    async def send_proactive_group_message(self, group_openid: str, content: str) -> dict[str, Any]:
-        body = self._build_proactive_body(content)
-        return await self._request("POST", f"/v2/groups/{group_openid}/messages", json=body)
-
     async def send_c2c_input_notify(
         self,
         openid: str,
@@ -416,13 +407,6 @@ class QQBotAPI:
         if inline_keyboard:
             body["keyboard"] = inline_keyboard.to_dict()
         return body
-
-    def _build_proactive_body(self, content: str) -> dict[str, Any]:
-        if not content or not content.strip():
-            raise ValueError("proactive message content must not be empty")
-        if self.markdown_support:
-            return {"markdown": {"content": content}, "msg_type": 2}
-        return {"content": content, "msg_type": 0}
 
     @staticmethod
     def _next_msg_seq(msg_id: str) -> int:
